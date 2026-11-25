@@ -22,7 +22,7 @@ import requests
 def negotiate(session, base):
     """Pakai versi API tertinggi yang didukung server (maks. 9); Paperless lama menolak versi=9 dengan 406."""
     try:
-        r = session.get(f"{base}/api/", timeout=20)
+        r = session.get(f"{base}/api/statistics/", timeout=20)
         v = r.headers.get("X-Api-Version")
         if v and v.isdigit():
             session.headers["Accept"] = f"application/json; version={min(int(v), 9)}"

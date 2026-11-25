@@ -18,6 +18,7 @@ class Paperless:
         self.s.verify = verify_tls
         self.s.headers.update({"Authorization": f"Token {token}", "Accept": "application/json"})
         self.api_version = None
+        self.server_version = "?"
         self._negotiated = False
 
     # ------------------------------------------------------------ dasar
@@ -29,8 +30,10 @@ class Paperless:
         min(server, MAX_API_VERSION). Paperless lama membalas 406 kalau diminta versi terlalu tinggi."""
         if self._negotiated:
             return
-        r = self.s.get(self._url("/api/"), timeout=min(self.timeout, 20))
-        self._check(r, "GET", "/api/")
+        # bukan /api/: di Paperless-ngx 3.x root /api/ membalas HTML dan menolak Accept JSON (406)
+        r = self.s.get(self._url("/api/statistics/"), timeout=min(self.timeout, 20))
+        self._check(r, "GET", "/api/statistics/")
+        self.server_version = r.headers.get("X-Version") or "?"
         server_max = r.headers.get("X-Api-Version")
         try:
             v = min(int(server_max), MAX_API_VERSION) if server_max else None
@@ -78,8 +81,8 @@ class Paperless:
         return f"{self.base}/documents/{doc_id}/details"
 
     def version(self):
-        r = self.get("/api/", timeout=15)
-        return r.headers.get("X-Version") or r.headers.get("x-version") or "?"
+        self._negotiate()
+        return self.server_version
 
     def statistics(self):
         return self.get("/api/statistics/", timeout=20).json()
