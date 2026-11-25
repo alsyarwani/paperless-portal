@@ -140,7 +140,7 @@ Hak cipta (c) 2026 Muhammad Syarwani (AlBanjari Project).
 
 Proyek ini memakai **[PolyForm Noncommercial License 1.0.0](LICENSE)**:
 
-- **Gratis** untuk penggunaan nonkomersial: pribadi, belajar, riset, hobi, ibadah, lembaga pendidikan, lembaga amal/sosial, dan instansi pemerintah. Boleh diubah dan dibagikan ulang, asalkan menyertakan file `LICENSE` ini.
+- **Gratis** untuk penggunaan nonkomersial: pribadi, belajar, riset, hobi, ibadah, lembaga pendidikan, lembaga amal/sosial, dan instansi pemerintah. Boleh diubah dan dibagikan ulang, asalkan menyertakan file `LICENSE` dan `NOTICE`.
 - **Penggunaan komersial** (dijual, dipakai di produk atau layanan berbayar, atau dipakai perusahaan untuk mencari keuntungan) memerlukan **lisensi komersial berbayar**. Hubungi **alsyarwani@gmail.com**.
 
 Catatan: ini lisensi *source-available*, bukan lisensi open source versi OSI, karena membatasi penggunaan komersial.
