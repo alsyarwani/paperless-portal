@@ -1,5 +1,7 @@
 # Paperless Portal
 
+> **English:** a self-hosted web portal for managing several Paperless-ngx instances: status dashboard, combined full-text search, document migration between instances (original file, OCR text, metadata, notes, custom fields), verified source deletion, file lookup, and failed-task overview. UI in Indonesian. Free for noncommercial use ([PolyForm Noncommercial 1.0.0](LICENSE)); commercial use requires a paid license: alsyarwani@gmail.com.
+
 Satu halaman web untuk mengelola beberapa Paperless-ngx sekaligus:
 
 - **Dasbor**: status semua instance (online/offline, versi, jumlah dokumen, inbox, task gagal, waktu respons).
@@ -45,7 +47,7 @@ Image dibangun otomatis oleh GitHub Actions setiap ada push ke `main` (tag `late
 Buat folder data dulu di host (portal berjalan sebagai uid 1000):
 
 ```bash
-sudo mkdir -p /home/data/portalpaper && sudo chown 1000:1000 /home/data/portalpaper
+sudo mkdir -p /srv/paperless-portal/data && sudo chown 1000:1000 /srv/paperless-portal/data
 ```
 
 Lalu buka Stacks → Add stack → *Web editor*. Registry `ghcr.io` harus sudah terdaftar di Portainer (Registries) dengan token `read:packages`.
@@ -63,15 +65,15 @@ services:
       COOKIE_SECURE: "true"                    # "false" kalau diakses lewat http biasa
       TZ: Asia/Makassar
     volumes:
-      - /home/data/portalpaper:/data
+      - /srv/paperless-portal/data:/data
     networks:
-      - jalurgateway
+      - paperless_net        # network Docker yang juga dipakai container Paperless Anda
 networks:
-  jalurgateway:
+  paperless_net:
     external: true
 ```
 
-Dengan network `jalurgateway`, portal bisa memanggil Paperless langsung lewat nama container. Isi URL instance dengan, misalnya, `http://paper1:8000`, dan matikan verifikasi TLS. Portal sendiri dibuka lewat proxy host di Nginx Proxy Manager yang diarahkan ke `paperless-portal` port `8000`.
+Kalau portal berada di network Docker yang sama dengan Paperless, portal bisa memanggil Paperless langsung lewat nama container. Isi URL instance dengan, misalnya, `http://paperless:8000`, dan matikan verifikasi TLS. Portal sendiri dibuka lewat reverse proxy (misalnya Nginx Proxy Manager) yang diarahkan ke `paperless-portal` port `8000`.
 
 Untuk update: buka stack di Portainer → *Update the stack* → nyalakan **Re-pull image and redeploy** → *Update*.
 
@@ -83,7 +85,7 @@ Untuk update: buka stack di Portainer → *Update the stack* → nyalakan **Re-p
 
 ## Pemakaian
 
-1. **Pengaturan → Tambah instance**: isi nama, URL, dan API token (dari Profil → API Auth Token di Paperless). URL bisa alamat internal seperti `http://paper1:8000` (satu network Docker) atau domain seperti `https://paperless.serrumah.my.id`. Klik *Tes koneksi*, lalu *Simpan*. Centang *Aktif* untuk instance yang mau dipakai.
+1. **Pengaturan → Tambah instance**: isi nama, URL, dan API token (dari Profil → API Auth Token di Paperless). URL bisa alamat internal seperti `http://paperless:8000` (satu network Docker) atau domain seperti `https://paperless.example.com`. Klik *Tes koneksi*, lalu *Simpan*. Centang *Aktif* untuk instance yang mau dipakai.
 2. **Migrasi**: pilih sumber, tujuan, dan filter, lalu *Dry-run* untuk melihat hasilnya dulu, kemudian *Jalankan migrasi*. Progres bisa dipantau di halaman job. Kalau halaman ditutup, job tetap berjalan di server.
 3. **Hapus dari sumber**: klik *Pratinjau yang akan dihapus* dengan sumber, tujuan, dan filter yang sama. Di halaman job, ketik `HAPUS` lalu tekan tombol hapus. Setiap dokumen diverifikasi ulang sebelum dihapus. Di Paperless versi baru, dokumen yang dihapus masuk Trash dulu.
 4. **Sudah pernah memakai `paperless_migrate.py`?** Buka Migrasi → *Impor riwayat*, lalu unggah `migrate_state.json`, supaya dokumen yang sudah dipindah tidak diproses lagi. Kalaupun tidak diimpor, dokumen yang sudah ada di tujuan akan terdeteksi sebagai DUPLIKAT lewat checksum dan tidak diunggah ulang.
@@ -131,3 +133,14 @@ Folder `cli/` berisi versi baris perintah yang dipakai sebelum portal ini ada:
 
 - `paperless_migrate.py`: migrasi dengan filter, log CSV, tag penanda, dan `--delete-source`.
 - `cek_file.py`: cek apakah file (berdasarkan nama aslinya) ada di sumber, Trash, dan tujuan.
+
+## Lisensi
+
+Hak cipta (c) 2026 Muhammad Syarwani (AlBanjari Project).
+
+Proyek ini memakai **[PolyForm Noncommercial License 1.0.0](LICENSE)**:
+
+- **Gratis** untuk penggunaan nonkomersial: pribadi, belajar, riset, hobi, ibadah, lembaga pendidikan, lembaga amal/sosial, dan instansi pemerintah. Boleh diubah dan dibagikan ulang, asalkan menyertakan file `LICENSE` ini.
+- **Penggunaan komersial** (dijual, dipakai di produk atau layanan berbayar, atau dipakai perusahaan untuk mencari keuntungan) memerlukan **lisensi komersial berbayar**. Hubungi **alsyarwani@gmail.com**.
+
+Catatan: ini lisensi *source-available*, bukan lisensi open source versi OSI, karena membatasi penggunaan komersial.
