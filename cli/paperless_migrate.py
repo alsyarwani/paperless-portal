@@ -52,6 +52,17 @@ import requests
 PAGE_SIZE = 100
 
 
+def negotiate(session, base):
+    """Pakai versi API tertinggi yang didukung server (maks. 9); Paperless lama menolak versi=9 dengan 406."""
+    try:
+        r = session.get(f"{base}/api/", timeout=20)
+        v = r.headers.get("X-Api-Version")
+        if v and v.isdigit():
+            session.headers["Accept"] = f"application/json; version={min(int(v), 9)}"
+    except Exception:  # noqa
+        pass
+
+
 # ---------------------------------------------------------------- HTTP helper
 class PL:
     def __init__(self, url, token, name):
@@ -60,8 +71,9 @@ class PL:
         self.s = requests.Session()
         self.s.headers.update({
             "Authorization": f"Token {token}",
-            "Accept": "application/json; version=9",
+            "Accept": "application/json",
         })
+        negotiate(self.s, self.base)
 
     def _url(self, path):
         return path if path.startswith("http") else f"{self.base}{path}"

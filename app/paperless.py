@@ -2,7 +2,7 @@
 import requests
 
 PAGE_SIZE = 100
-API_ACCEPT = "application/json; version=9"
+MAX_API_VERSION = 9  # versi API tertinggi yang dipakai portal; diturunkan otomatis untuk Paperless lama
 
 
 class PaperlessError(RuntimeError):
@@ -16,11 +16,30 @@ class Paperless:
         self.timeout = timeout
         self.s = requests.Session()
         self.s.verify = verify_tls
-        self.s.headers.update({"Authorization": f"Token {token}", "Accept": API_ACCEPT})
+        self.s.headers.update({"Authorization": f"Token {token}", "Accept": "application/json"})
+        self.api_version = None
+        self._negotiated = False
 
     # ------------------------------------------------------------ dasar
     def _url(self, path):
         return path if path.startswith("http") else f"{self.base}{path}"
+
+    def _negotiate(self):
+        """Tanya versi API tertinggi yang didukung server (header X-Api-Version), lalu pakai
+        min(server, MAX_API_VERSION). Paperless lama membalas 406 kalau diminta versi terlalu tinggi."""
+        if self._negotiated:
+            return
+        r = self.s.get(self._url("/api/"), timeout=min(self.timeout, 20))
+        self._check(r, "GET", "/api/")
+        server_max = r.headers.get("X-Api-Version")
+        try:
+            v = min(int(server_max), MAX_API_VERSION) if server_max else None
+        except ValueError:
+            v = None
+        if v:
+            self.s.headers["Accept"] = f"application/json; version={v}"
+        self.api_version = v
+        self._negotiated = True
 
     def _check(self, r, method, path):
         if r.status_code >= 400:
@@ -28,14 +47,17 @@ class Paperless:
         return r
 
     def get(self, path, **kw):
+        self._negotiate()
         kw.setdefault("timeout", self.timeout)
         return self._check(self.s.get(self._url(path), **kw), "GET", path)
 
     def post(self, path, **kw):
+        self._negotiate()
         kw.setdefault("timeout", 300)
         return self._check(self.s.post(self._url(path), **kw), "POST", path)
 
     def patch(self, path, **kw):
+        self._negotiate()
         kw.setdefault("timeout", self.timeout)
         return self._check(self.s.patch(self._url(path), **kw), "PATCH", path)
 
@@ -91,6 +113,7 @@ class Paperless:
     def trash(self):
         """Daftar dokumen di Trash (Paperless-ngx >= 2.10). None jika tidak didukung."""
         try:
+            self._negotiate()
             r = self.s.get(self._url("/api/trash/"), params={"page_size": 100}, timeout=self.timeout)
             if r.status_code == 404:
                 return None

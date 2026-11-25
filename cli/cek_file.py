@@ -19,9 +19,21 @@ import sys
 import requests
 
 
-def session(token):
+def negotiate(session, base):
+    """Pakai versi API tertinggi yang didukung server (maks. 9); Paperless lama menolak versi=9 dengan 406."""
+    try:
+        r = session.get(f"{base}/api/", timeout=20)
+        v = r.headers.get("X-Api-Version")
+        if v and v.isdigit():
+            session.headers["Accept"] = f"application/json; version={min(int(v), 9)}"
+    except Exception:  # noqa
+        pass
+
+
+def session(token, base):
     s = requests.Session()
-    s.headers.update({"Authorization": f"Token {token}", "Accept": "application/json; version=9"})
+    s.headers.update({"Authorization": f"Token {token}", "Accept": "application/json"})
+    negotiate(s, base)
     return s
 
 
@@ -81,7 +93,7 @@ def main():
             sys.exit(f"ERROR: environment variable {v} belum di-set")
 
     sb, db = os.environ["SRC_URL"].rstrip("/"), os.environ["DST_URL"].rstrip("/")
-    ss, ds = session(os.environ["SRC_TOKEN"]), session(os.environ["DST_TOKEN"])
+    ss, ds = session(os.environ["SRC_TOKEN"], sb), session(os.environ["DST_TOKEN"], db)
     trash = load_trash(ss, sb)
 
     ringkas = {"aman": 0, "hanya_sumber": 0, "hilang": 0}
