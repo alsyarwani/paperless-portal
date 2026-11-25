@@ -19,7 +19,7 @@ Token API Paperless disimpan **terenkripsi** di server portal dan tidak pernah d
 
 ## Pasang (Docker)
 
-Ambil kode ke server, misalnya ke `/opt/paperless-portal`. Repo ini private, jadi `git clone https://github.com/alsyarwani/paperless-portal.git` akan meminta login: pakai username GitHub dan *personal access token* (bukan password). Bisa juga salin folder dengan `scp -r`. Lalu jalankan:
+Ambil kode ke server, misalnya dengan `sudo git clone https://github.com/alsyarwani/paperless-portal.git /opt/paperless-portal`. Lalu jalankan:
 
 ```bash
 sudo bash -c '
@@ -33,10 +33,9 @@ echo ">> Edit .env: isi PORTAL_PASSWORD (dan PORTAL_BIND bila perlu)"
 '
 ```
 
-Setelah `.env` diisi, pakai image siap pakai dari GHCR. Karena repo private, image-nya juga private, jadi server perlu login sekali dulu dengan personal access token yang punya izin `read:packages`:
+Setelah `.env` diisi, pakai image siap pakai dari GHCR (publik, tidak perlu login):
 
 ```bash
-echo "<TOKEN>" | sudo docker login ghcr.io -u alsyarwani --password-stdin
 cd /opt/paperless-portal && sudo docker compose pull && sudo docker compose up -d && sudo docker compose logs --tail 20
 ```
 
@@ -50,7 +49,7 @@ Buat folder data dulu di host (portal berjalan sebagai uid 1000):
 sudo mkdir -p /srv/paperless-portal/data && sudo chown 1000:1000 /srv/paperless-portal/data
 ```
 
-Lalu buka Stacks → Add stack → *Web editor*. Registry `ghcr.io` harus sudah terdaftar di Portainer (Registries) dengan token `read:packages`.
+Lalu buka Stacks → Add stack → *Web editor*. Image-nya publik, jadi tidak perlu mendaftarkan registry di Portainer.
 
 ```yaml
 services:
