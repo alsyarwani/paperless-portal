@@ -28,11 +28,14 @@ echo ">> Edit .env: isi PORTAL_PASSWORD (dan PORTAL_BIND bila perlu)"
 '
 ```
 
-Setelah `.env` diisi:
+Setelah `.env` diisi, pakai image siap pakai dari GHCR. Karena repo private, image-nya juga private, jadi server perlu login sekali dulu dengan personal access token yang punya izin `read:packages`:
 
 ```bash
-cd /opt/paperless-portal && sudo docker compose up -d --build && sudo docker compose logs --tail 20
+echo "<TOKEN>" | sudo docker login ghcr.io -u alsyarwani --password-stdin
+cd /opt/paperless-portal && sudo docker compose pull && sudo docker compose up -d && sudo docker compose logs --tail 20
 ```
+
+Image dibangun otomatis oleh GitHub Actions setiap ada push ke `main` (tag `latest` dan `sha-xxxxxxx`). Untuk memperbarui portal di server, cukup jalankan `docker compose pull && docker compose up -d`. Kalau mau build sendiri di server tanpa GHCR, jalankan `docker compose up -d --build`.
 
 Lewat **Portainer**: Stacks → Add stack → *Repository* (URL repo di atas) atau *Upload* folder ini. Isi environment variable seperti di `.env.example`.
 

@@ -1,7 +1,8 @@
 services:
   paperless-portal:
+    # image dibangun otomatis oleh GitHub Actions; untuk build lokal: docker compose build
+    image: ghcr.io/alsyarwani/paperless-portal:latest
     build: .
-    image: paperless-portal:latest
     container_name: paperless-portal
     restart: unless-stopped
     ports:
