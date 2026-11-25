@@ -104,6 +104,9 @@ def init():
     with conn() as c:
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript(SCHEMA)
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(instances)")}
+        if "enabled" not in cols:
+            c.execute("ALTER TABLE instances ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
         # job yang masih berjalan saat container mati -> tandai terhenti
         c.execute("UPDATE jobs SET status='terhenti', finished=? WHERE status IN ('berjalan','antri')",
                   (now(),))
@@ -113,7 +116,16 @@ def init():
 def list_instances():
     with conn() as c:
         return [dict(r) for r in c.execute(
-            "SELECT id, name, url, verify_tls, created FROM instances ORDER BY name")]
+            "SELECT id, name, url, verify_tls, enabled, created FROM instances ORDER BY name")]
+
+
+def active_instances():
+    return [i for i in list_instances() if i["enabled"]]
+
+
+def set_enabled(iid, enabled):
+    with conn() as c:
+        c.execute("UPDATE instances SET enabled=? WHERE id=?", (int(enabled), iid))
 
 
 def get_instance(iid, with_token=False):
@@ -128,18 +140,18 @@ def get_instance(iid, with_token=False):
     return d
 
 
-def save_instance(name, url, token, verify_tls=True, iid=None):
+def save_instance(name, url, token, verify_tls=True, iid=None, enabled=True):
     with conn() as c:
         if iid:
             if token:
-                c.execute("UPDATE instances SET name=?, url=?, token_enc=?, verify_tls=? WHERE id=?",
-                          (name, url.rstrip("/"), encrypt(token), int(verify_tls), iid))
+                c.execute("UPDATE instances SET name=?, url=?, token_enc=?, verify_tls=?, enabled=? WHERE id=?",
+                          (name, url.rstrip("/"), encrypt(token), int(verify_tls), int(enabled), iid))
             else:
-                c.execute("UPDATE instances SET name=?, url=?, verify_tls=? WHERE id=?",
-                          (name, url.rstrip("/"), int(verify_tls), iid))
+                c.execute("UPDATE instances SET name=?, url=?, verify_tls=?, enabled=? WHERE id=?",
+                          (name, url.rstrip("/"), int(verify_tls), int(enabled), iid))
             return iid
-        cur = c.execute("INSERT INTO instances(name,url,token_enc,verify_tls,created) VALUES(?,?,?,?,?)",
-                        (name, url.rstrip("/"), encrypt(token), int(verify_tls), now()))
+        cur = c.execute("INSERT INTO instances(name,url,token_enc,verify_tls,enabled,created) VALUES(?,?,?,?,?,?)",
+                        (name, url.rstrip("/"), encrypt(token), int(verify_tls), int(enabled), now()))
         return cur.lastrowid
 
 

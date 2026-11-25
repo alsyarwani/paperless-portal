@@ -118,6 +118,7 @@ class InstanceIn(BaseModel):
     url: str = Field(min_length=8)
     token: str = ""
     verify_tls: bool = True
+    enabled: bool = True
 
 
 def client(iid, timeout=30) -> Paperless:
@@ -157,15 +158,25 @@ def add_instance(body: InstanceIn, _=Depends(require_login)):
     if not body.token:
         raise HTTPException(400, "token wajib diisi")
     try:
-        return {"id": db.save_instance(body.name, body.url, body.token, body.verify_tls)}
+        return {"id": db.save_instance(body.name, body.url, body.token, body.verify_tls, enabled=body.enabled)}
     except Exception as e:  # noqa
         raise HTTPException(400, str(e))
 
 
 @app.put("/api/instances/{iid}")
 def edit_instance(iid: int, body: InstanceIn, _=Depends(require_login)):
-    db.save_instance(body.name, body.url, body.token, body.verify_tls, iid=iid)
+    db.save_instance(body.name, body.url, body.token, body.verify_tls, iid=iid, enabled=body.enabled)
     return {"id": iid}
+
+
+class EnabledIn(BaseModel):
+    enabled: bool
+
+
+@app.post("/api/instances/{iid}/enabled")
+def toggle_instance(iid: int, body: EnabledIn, _=Depends(require_login)):
+    db.set_enabled(iid, body.enabled)
+    return {"id": iid, "enabled": body.enabled}
 
 
 @app.delete("/api/instances/{iid}")
@@ -209,7 +220,7 @@ def _status(inst):
 
 @app.get("/api/dashboard")
 def dashboard(_=Depends(require_login)):
-    return list(pool.map(_status, db.list_instances()))
+    return list(pool.map(_status, db.active_instances()))
 
 
 # ------------------------------------------------------------------ pencarian
@@ -237,7 +248,7 @@ def search(q: str, instances: str = "", size: int = 10, _=Depends(require_login)
     if not q:
         return []
     ids = {int(i) for i in instances.split(",") if i.strip().isdigit()}
-    targets = [i for i in db.list_instances() if not ids or i["id"] in ids]
+    targets = [i for i in db.active_instances() if not ids or i["id"] in ids]
     size = max(1, min(size, 50))
     return list(pool.map(lambda i: _search_one(i, q, size), targets))
 
@@ -304,7 +315,7 @@ def _check_instance(inst, names):
 @app.post("/api/checkfiles")
 def checkfiles(body: CheckIn, _=Depends(require_login)):
     names = [n.strip() for n in body.names if n.strip()][:300]
-    targets = [i for i in db.list_instances() if not body.instances or i["id"] in body.instances]
+    targets = [i for i in db.active_instances() if not body.instances or i["id"] in body.instances]
     per_inst = list(pool.map(lambda i: _check_instance(i, names), targets))
     rows = []
     for n in names:
@@ -336,9 +347,12 @@ class JobIn(BaseModel):
 def create_job(body: JobIn, _=Depends(require_login)):
     if body.src == body.dst:
         raise HTTPException(400, "sumber dan tujuan tidak boleh sama")
-    for iid in (body.src, body.dst):
-        if not db.get_instance(iid):
-            raise HTTPException(404, f"instance {iid} tidak ada")
+    a, b = db.get_instance(body.src), db.get_instance(body.dst)
+    if not a or not b:
+        raise HTTPException(404, "instance sumber/tujuan tidak ada")
+    if a["url"].rstrip("/").lower() == b["url"].rstrip("/").lower():
+        raise HTTPException(400, "Sumber dan tujuan adalah Paperless yang sama (URL sama, hanya beda user). "
+                                 "Migrasi di dalam satu Paperless tidak diperlukan; atur izin/pemilik dokumen di Paperless.")
     if body.kind == "delete" and not body.options.get("dry_run") and body.options.get("confirm") != "HAPUS":
         raise HTTPException(400, "konfirmasi HAPUS wajib untuk penghapusan")
     jid = jobs.submit(body.kind, body.src, body.dst, {"filter": body.filter, "options": body.options})

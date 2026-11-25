@@ -5,6 +5,7 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const fmt = (n) => (n === null || n === undefined ? "–" : Number(n).toLocaleString("id-ID"));
 
 let INST = [];
+const ACTIVE = () => INST.filter((i) => i.enabled);
 let currentJob = null, jobTimer = null, lastItemId = 0, jobStatusFilter = "";
 
 /* ------------------------------------------------------------------ api */
@@ -55,11 +56,11 @@ document.addEventListener("click", (e) => { const g = e.target.closest("[data-go
 async function loadInstances() { INST = await api("/api/instances"); }
 const instName = (id) => INST.find((i) => i.id === id)?.name ?? "?";
 function instOptions(sel, withEmpty) {
-  sel.innerHTML = (withEmpty ? `<option value="">— pilih —</option>` : "") + INST.map((i) => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
+  sel.innerHTML = (withEmpty ? `<option value="">— pilih —</option>` : "") + ACTIVE().map((i) => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
 }
 function instChips(box, key) {
   const saved = JSON.parse(localStorage.getItem(key) || "null");
-  box.innerHTML = INST.map((i) => `<span class="chip ${!saved || saved.includes(i.id) ? "on" : ""}" data-id="${i.id}">${esc(i.name)}</span>`).join("");
+  box.innerHTML = ACTIVE().map((i) => `<span class="chip ${!saved || saved.includes(i.id) ? "on" : ""}" data-id="${i.id}">${esc(i.name)}</span>`).join("");
   box.onclick = (e) => {
     const c = e.target.closest(".chip"); if (!c) return; c.classList.toggle("on");
     try { localStorage.setItem(key, JSON.stringify(chosen(box))); } catch {}
@@ -69,8 +70,8 @@ const chosen = (box) => $$(".chip.on", box).map((c) => +c.dataset.id);
 
 /* ------------------------------------------------------------------ dasbor */
 const loadDash = guard(async () => {
-  if (!INST.length) { $("#dashCards").innerHTML = `<div class="panel">Belum ada instance. Tambahkan di <a data-goto="settings" href="#">Pengaturan</a>.</div>`; $("#dashTotals").innerHTML = ""; return; }
-  $("#dashCards").innerHTML = INST.map((i) => `<div class="card"><h3><span class="dot"></span>${esc(i.name)}</h3><div class="muted">memuat…</div></div>`).join("");
+  if (!ACTIVE().length) { $("#dashCards").innerHTML = `<div class="panel">Belum ada instance aktif. Tambahkan di <a data-goto="settings" href="#">Pengaturan</a>.</div>`; $("#dashTotals").innerHTML = ""; return; }
+  $("#dashCards").innerHTML = ACTIVE().map((i) => `<div class="card"><h3><span class="dot"></span>${esc(i.name)}</h3><div class="muted">memuat…</div></div>`).join("");
   const data = await api("/api/dashboard");
   const on = data.filter((d) => d.online);
   const sum = (k) => on.reduce((a, d) => a + (d[k] || 0), 0);
@@ -120,10 +121,10 @@ $("#searchForm").addEventListener("submit", guard(async (e) => {
 /* ------------------------------------------------------------------ migrasi */
 let migrateReady = false;
 async function initMigrate() {
-  if (!INST.length) { toast("Tambahkan minimal dua instance di Pengaturan dulu.", true); return; }
+  if (ACTIVE().length < 2) { toast("Butuh minimal dua instance aktif (Pengaturan).", true); return; }
   if (!migrateReady) {
     instOptions($("#mSrc")); instOptions($("#mDst"));
-    if (INST.length > 1) $("#mDst").selectedIndex = 1;
+    $("#mDst").selectedIndex = 1;
     $("#mSrc").onchange = guard(loadSrcMeta); $("#mDst").onchange = guard(loadMapInfo);
     migrateReady = true;
   }
@@ -330,12 +331,16 @@ $("#tAck").onclick = guard(async () => {
 /* ------------------------------------------------------------------ pengaturan */
 const loadSettings = guard(async () => {
   await loadInstances();
-  $("#instRows").innerHTML = INST.map((i) => `<tr><td><b>${esc(i.name)}</b></td><td class="url">${esc(i.url)}</td><td>${i.verify_tls ? "verifikasi" : "<span class='badge DUPLIKAT'>tanpa verifikasi</span>"}</td>
+  $("#instRows").innerHTML = INST.map((i) => `<tr class="${i.enabled ? "" : "muted"}"><td><input type="checkbox" data-en="${i.id}" ${i.enabled ? "checked" : ""} title="Aktif"></td><td><b>${esc(i.name)}</b></td><td class="url">${esc(i.url)}</td><td>${i.verify_tls ? "verifikasi" : "<span class='badge DUPLIKAT'>tanpa verifikasi</span>"}</td>
     <td class="row gap"><button class="btn small" data-edit="${i.id}">Edit</button><button class="btn small danger" data-del="${i.id}">Hapus</button></td></tr>`).join("")
-    || `<tr><td colspan="4" class="muted">Belum ada instance.</td></tr>`;
+    || `<tr><td colspan="5" class="muted">Belum ada instance.</td></tr>`;
+  $$("[data-en]").forEach((c) => (c.onchange = guard(async () => {
+    await api(`/api/instances/${c.dataset.en}/enabled`, { method: "POST", body: { enabled: c.checked } });
+    toast(`${instName(+c.dataset.en)} ${c.checked ? "diaktifkan" : "dinonaktifkan"}.`); migrateReady = false; loadSettings();
+  })));
   $$("[data-edit]").forEach((b) => (b.onclick = () => {
     const i = INST.find((x) => x.id === +b.dataset.edit), f = $("#instForm");
-    f.id.value = i.id; f.name.value = i.name; f.url.value = i.url; f.token.value = ""; f.verify_tls.checked = !!i.verify_tls;
+    f.id.value = i.id; f.name.value = i.name; f.url.value = i.url; f.token.value = ""; f.verify_tls.checked = !!i.verify_tls; f.enabled.checked = !!i.enabled;
     f.token.placeholder = "(kosongkan = pakai token lama)"; $("#instFormTitle").textContent = `Edit: ${i.name}`; f.name.focus();
   }));
   $$("[data-del]").forEach((b) => (b.onclick = guard(async () => {
@@ -345,7 +350,7 @@ const loadSettings = guard(async () => {
 });
 function instBody() {
   const f = $("#instForm");
-  return { name: f.name.value.trim(), url: f.url.value.trim(), token: f.token.value.trim(), verify_tls: f.verify_tls.checked };
+  return { name: f.name.value.trim(), url: f.url.value.trim(), token: f.token.value.trim(), verify_tls: f.verify_tls.checked, enabled: f.enabled.checked };
 }
 function resetInst() {
   const f = $("#instForm"); f.reset(); f.id.value = ""; f.token.placeholder = "Profil → API Auth Token";

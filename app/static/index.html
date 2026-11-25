@@ -171,7 +171,10 @@
           <label>Nama <input name="name" required placeholder="paperless-utama"></label>
           <label>URL <input name="url" required placeholder="https://paperless.contoh.id"></label>
           <label>API token <input name="token" type="password" autocomplete="off" placeholder="Profil → API Auth Token"></label>
-          <label class="check"><input type="checkbox" name="verify_tls" checked> Verifikasi sertifikat TLS</label>
+          <div class="row gap">
+            <label class="check"><input type="checkbox" name="verify_tls" checked> Verifikasi sertifikat TLS</label>
+            <label class="check"><input type="checkbox" name="enabled" checked> Aktif</label>
+          </div>
           <div class="row gap full">
             <button type="button" class="btn" id="instTest">Tes koneksi</button>
             <button class="btn primary">Simpan</button>
@@ -182,7 +185,9 @@
         <p class="muted small">Token disimpan terenkripsi di server portal dan tidak pernah dikirim ke browser.
           Saat mengedit, kosongkan kolom token untuk memakai token lama.</p>
       </div>
-      <table class="tbl"><thead><tr><th>Nama</th><th>URL</th><th>TLS</th><th></th></tr></thead><tbody id="instRows"></tbody></table>
+      <p class="muted small">Centang <b>Aktif</b> untuk menampilkan instance di Dasbor, Cari, Migrasi, Cek file, dan Task gagal.
+        Satu Paperless boleh ditambahkan beberapa kali dengan token user yang berbeda (nama harus beda).</p>
+      <table class="tbl"><thead><tr><th>Aktif</th><th>Nama</th><th>URL</th><th>TLS</th><th></th></tr></thead><tbody id="instRows"></tbody></table>
     </section>
   </main>
 </div>
