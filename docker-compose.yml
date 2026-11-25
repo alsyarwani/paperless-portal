@@ -1,0 +1,17 @@
+services:
+  paperless-portal:
+    build: .
+    image: paperless-portal:latest
+    container_name: paperless-portal
+    restart: unless-stopped
+    ports:
+      # ikat ke IP tailnet host (atau 127.0.0.1) lalu reverse proxy dari aaPanel
+      - "${PORTAL_BIND:-127.0.0.1}:${PORTAL_PORT:-8650}:8000"
+    environment:
+      PORTAL_USER: ${PORTAL_USER:-admin}
+      PORTAL_PASSWORD: ${PORTAL_PASSWORD:?isi PORTAL_PASSWORD di .env}
+      SECRET_KEY: ${SECRET_KEY:?isi SECRET_KEY di .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TZ: Asia/Makassar
+    volumes:
+      - ./data:/data

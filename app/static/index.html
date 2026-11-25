@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paperless Portal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2317694a'/%3E%3Cpath d='M9 8h11l4 4v12H9z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login hidden">
+  <form id="loginForm" class="login-card">
+    <div class="brand big"><span class="logo">▤</span> Paperless Portal</div>
+    <label>Username <input name="username" autocomplete="username" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit">Masuk</button>
+    <p id="loginErr" class="err"></p>
+  </form>
+</div>
+
+<!-- APP -->
+<div id="app" class="app hidden">
+  <aside class="side">
+    <div class="brand"><span class="logo">▤</span> Paperless Portal</div>
+    <nav id="nav">
+      <a data-page="dash" class="active">Dasbor</a>
+      <a data-page="search">Cari</a>
+      <a data-page="migrate">Migrasi</a>
+      <a data-page="jobs">Riwayat job</a>
+      <a data-page="check">Cek file</a>
+      <a data-page="tasks">Task gagal</a>
+      <a data-page="settings">Pengaturan</a>
+    </nav>
+    <button id="logout" class="btn ghost small">Keluar</button>
+  </aside>
+
+  <main>
+    <!-- DASBOR -->
+    <section id="page-dash" class="page">
+      <header class="ph"><h1>Dasbor</h1><button class="btn" id="dashRefresh">Muat ulang</button></header>
+      <div id="dashTotals" class="totals"></div>
+      <div id="dashCards" class="cards"></div>
+    </section>
+
+    <!-- CARI -->
+    <section id="page-search" class="page hidden">
+      <header class="ph"><h1>Pencarian gabungan</h1></header>
+      <form id="searchForm" class="row gap">
+        <input id="searchQ" class="grow" placeholder="Cari teks isi dokumen di semua Paperless…" autofocus>
+        <button class="btn primary">Cari</button>
+      </form>
+      <div id="searchInst" class="chips"></div>
+      <div id="searchRes"></div>
+    </section>
+
+    <!-- MIGRASI -->
+    <section id="page-migrate" class="page hidden">
+      <header class="ph"><h1>Migrasi antar Paperless</h1></header>
+      <div class="panel">
+        <h2>1. Sumber &amp; tujuan</h2>
+        <div class="grid2">
+          <label>Sumber <select id="mSrc"></select></label>
+          <label>Tujuan <select id="mDst"></select></label>
+        </div>
+        <p id="mMapInfo" class="muted"></p>
+
+        <h2>2. Filter dokumen di sumber</h2>
+        <div class="grid2">
+          <label>Storage path <select id="mSp"><option value="">— semua —</option></select></label>
+          <label>Full-text query <input id="mQuery" placeholder="opsional"></label>
+          <label>Wajib punya SEMUA tag ini <select id="mTags" multiple size="6"></select></label>
+          <label>Punya SALAH SATU tag ini <select id="mAnyTags" multiple size="6"></select></label>
+        </div>
+        <p class="muted small">Ctrl/Cmd + klik untuk memilih beberapa tag. Minimal satu filter wajib diisi.</p>
+
+        <h2>3. Opsi</h2>
+        <div class="grid3">
+          <label>Tag sukses (di sumber) <input id="oMark" value="migrated"></label>
+          <label>Tag gagal <input id="oFail" value="migrate-gagal"></label>
+          <label>Tag duplikat <input id="oDup" value="migrate-duplikat"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="oNoContent"> Jangan timpa teks OCR di tujuan dengan teks dari sumber</label>
+
+        <div class="row gap mt">
+          <button class="btn" id="mDry">Dry-run (simulasi)</button>
+          <button class="btn primary" id="mRun">Jalankan migrasi</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Hapus dari sumber yang sudah dipindah</h2>
+        <p class="muted">Memakai sumber, tujuan, dan filter di atas. Dokumen hanya dihapus kalau file identiknya
+          (checksum sama) <b>terverifikasi ada di tujuan</b>. Dokumen yang gagal tidak pernah dihapus.</p>
+        <label class="check"><input type="checkbox" id="dDup"> Ikut hapus dokumen duplikat (file identik sudah ada di tujuan, tapi bukan hasil migrasi portal)</label>
+        <div class="row gap mt"><button class="btn" id="dPreview">Pratinjau yang akan dihapus</button></div>
+      </div>
+
+      <details class="panel">
+        <summary><h2 class="inline">Impor riwayat dari script CLI (migrate_state.json)</h2></summary>
+        <p class="muted">Supaya portal tahu dokumen mana yang sudah dipindah lewat <code>paperless_migrate.py</code>.
+          Memakai sumber &amp; tujuan yang dipilih di atas.</p>
+        <div class="row gap"><input type="file" id="impFile" accept=".json"><button class="btn" id="impBtn">Impor</button></div>
+        <p id="impMsg" class="muted"></p>
+      </details>
+    </section>
+
+    <!-- JOBS -->
+    <section id="page-jobs" class="page hidden">
+      <header class="ph"><h1>Riwayat job</h1><button class="btn" id="jobsRefresh">Muat ulang</button></header>
+      <div id="jobList"></div>
+    </section>
+
+    <section id="page-job" class="page hidden">
+      <header class="ph"><h1 id="jobTitle">Job</h1>
+        <div class="row gap">
+          <a class="btn" id="jobCsv">Unduh CSV</a>
+          <button class="btn danger" id="jobCancel">Batalkan</button>
+          <button class="btn" data-goto="jobs">Kembali</button>
+        </div>
+      </header>
+      <div class="panel">
+        <div id="jobMeta" class="muted"></div>
+        <div class="progress"><div id="jobBar"></div></div>
+        <div id="jobCounts" class="counts"></div>
+        <div id="jobDeleteBox" class="hidden delbox">
+          <p><b id="delCount"></b> dokumen terverifikasi ada di tujuan dan siap dihapus dari sumber.
+            Ketik <code>HAPUS</code> untuk melanjutkan.</p>
+          <div class="row gap"><input id="delConfirm" placeholder="HAPUS"><button class="btn danger" id="delGo">Hapus dari sumber</button></div>
+        </div>
+      </div>
+      <div id="jobFilter" class="chips"></div>
+      <div id="jobLog" class="log"></div>
+      <table class="tbl"><thead><tr><th>Waktu</th><th>Sumber</th><th>Judul</th><th>Status</th><th>Tujuan</th><th>Keterangan</th></tr></thead>
+        <tbody id="jobItems"></tbody></table>
+    </section>
+
+    <!-- CEK FILE -->
+    <section id="page-check" class="page hidden">
+      <header class="ph"><h1>Cek file di semua Paperless</h1></header>
+      <div class="panel">
+        <label>Nama file asli (satu per baris, atau tempel langsung dari daftar task)
+          <textarea id="chkNames" rows="8" placeholder="0000242.xlsx&#10;0000241.xlsx"></textarea></label>
+        <div id="chkInst" class="chips"></div>
+        <button class="btn primary" id="chkGo">Cek</button>
+      </div>
+      <div id="chkSummary" class="totals"></div>
+      <table class="tbl" id="chkTbl"></table>
+    </section>
+
+    <!-- TASKS -->
+    <section id="page-tasks" class="page hidden">
+      <header class="ph"><h1>Task consume yang gagal</h1>
+        <div class="row gap"><select id="tInst"></select><button class="btn" id="tLoad">Muat</button></div></header>
+      <div class="row gap mb">
+        <button class="btn" id="tToCheck">Cek file-file terpilih</button>
+        <button class="btn" id="tAck">Tandai sudah dibaca (dismiss)</button>
+      </div>
+      <table class="tbl"><thead><tr><th><input type="checkbox" id="tAll"></th><th>Waktu</th><th>File</th><th>Pesan</th></tr></thead>
+        <tbody id="tRows"></tbody></table>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="page-settings" class="page hidden">
+      <header class="ph"><h1>Instance Paperless</h1></header>
+      <div class="panel">
+        <h2 id="instFormTitle">Tambah instance</h2>
+        <form id="instForm" class="grid2">
+          <input type="hidden" name="id">
+          <label>Nama <input name="name" required placeholder="paperless-utama"></label>
+          <label>URL <input name="url" required placeholder="https://paperless.contoh.id"></label>
+          <label>API token <input name="token" type="password" autocomplete="off" placeholder="Profil → API Auth Token"></label>
+          <label class="check"><input type="checkbox" name="verify_tls" checked> Verifikasi sertifikat TLS</label>
+          <div class="row gap full">
+            <button type="button" class="btn" id="instTest">Tes koneksi</button>
+            <button class="btn primary">Simpan</button>
+            <button type="button" class="btn ghost" id="instReset">Batal</button>
+            <span id="instMsg" class="muted"></span>
+          </div>
+        </form>
+        <p class="muted small">Token disimpan terenkripsi di server portal dan tidak pernah dikirim ke browser.
+          Saat mengedit, kosongkan kolom token untuk memakai token lama.</p>
+      </div>
+      <table class="tbl"><thead><tr><th>Nama</th><th>URL</th><th>TLS</th><th></th></tr></thead><tbody id="instRows"></tbody></table>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
