@@ -224,12 +224,14 @@ def dashboard(_=Depends(require_login)):
 
 
 # ------------------------------------------------------------------ pencarian
-def _search_one(inst, q, size):
-    res = {"id": inst["id"], "name": inst["name"], "url": inst["url"], "results": [], "count": 0}
+def _search_one(inst, q, size, page=1):
+    res = {"id": inst["id"], "name": inst["name"], "url": inst["url"], "results": [], "count": 0,
+           "page": page, "has_more": False}
     try:
         pl = client(inst["id"], timeout=20)
-        data = pl.get("/api/documents/", params={"query": q, "page_size": size}).json()
+        data = pl.get("/api/documents/", params={"query": q, "page_size": size, "page": page}).json()
         res["count"] = data.get("count", 0)
+        res["has_more"] = bool(data.get("next")) or res["count"] > page * size
         for d in data.get("results", []):
             hit = d.get("__search_hit__") or {}
             res["results"].append({
@@ -243,14 +245,17 @@ def _search_one(inst, q, size):
 
 
 @app.get("/api/search")
-def search(q: str, instances: str = "", size: int = 10, _=Depends(require_login)):
+def search(q: str, instances: str = "", size: int = 20, page: int = 1, _=Depends(require_login)):
+    """Pencarian full-text Paperless (sama dengan 'pencarian lanjutan' di UI Paperless):
+    isi/teks OCR, judul, tag, koresponden, tipe dokumen, catatan."""
     q = q.strip()
     if not q:
         return []
     ids = {int(i) for i in instances.split(",") if i.strip().isdigit()}
     targets = [i for i in db.active_instances() if not ids or i["id"] in ids]
-    size = max(1, min(size, 50))
-    return list(pool.map(lambda i: _search_one(i, q, size), targets))
+    size = max(1, min(size, 100))
+    page = max(1, page)
+    return list(pool.map(lambda i: _search_one(i, q, size, page), targets))
 
 
 @app.get("/api/instances/{iid}/thumb/{doc_id}")

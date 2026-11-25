@@ -103,19 +103,38 @@ function highlight(h) {
   // highlight dari Paperless berisi <span class="match">; semua lainnya di-escape
   return esc(h).replace(/&lt;span class=&quot;match&quot;&gt;(.*?)&lt;\/span&gt;/g, '<span class="match">$1</span>');
 }
+const SEARCH_SIZE = 20;
+let lastQuery = "";
+function hitHtml(g, r) {
+  return `<div class="hit">
+    <img loading="lazy" src="/api/instances/${g.id}/thumb/${r.id}" alt="">
+    <div><a class="t" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.title)}</a>
+      <div class="small muted">#${r.id} · ${esc(r.created)} · ${esc(r.file || "")}</div>
+      <div class="h">${highlight(r.highlights)}</div></div></div>`;
+}
+function groupFooter(g, shown) {
+  const info = `<span class="muted small">menampilkan ${fmt(shown)} dari ${fmt(g.count)}</span>`;
+  return g.has_more ? `<div class="row gap mb">${info}<button class="btn small" data-more="${g.id}" data-page="${g.page + 1}">Tampilkan ${SEARCH_SIZE} lagi</button></div>` : `<div class="mb">${info}</div>`;
+}
 $("#searchForm").addEventListener("submit", guard(async (e) => {
   e.preventDefault();
   const q = $("#searchQ").value.trim(); if (!q) return;
+  lastQuery = q;
   $("#searchRes").innerHTML = `<p class="muted">Mencari…</p>`;
-  const res = await api(`/api/search?q=${encodeURIComponent(q)}&instances=${chosen($("#searchInst")).join(",")}&size=15`);
+  const res = await api(`/api/search?q=${encodeURIComponent(q)}&instances=${chosen($("#searchInst")).join(",")}&size=${SEARCH_SIZE}`);
   $("#searchRes").innerHTML = res.map((g) => `
-    <div class="sgroup"><h3>${esc(g.name)} <span class="muted small">${g.error ? `<span class="err">${esc(g.error)}</span>` : fmt(g.count) + " hasil"}</span></h3>
-      ${g.results.map((r) => `<div class="hit">
-        <img loading="lazy" src="/api/instances/${g.id}/thumb/${r.id}" alt="">
-        <div><a class="t" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.title)}</a>
-          <div class="small muted">#${r.id} · ${esc(r.created)} · ${esc(r.file || "")}</div>
-          <div class="h">${highlight(r.highlights)}</div></div></div>`).join("") || (g.error ? "" : `<p class="muted small">Tidak ada hasil.</p>`)}
+    <div class="sgroup" data-group="${g.id}"><h3>${esc(g.name)} <span class="muted small">${g.error ? `<span class="err">${esc(g.error)}</span>` : fmt(g.count) + " hasil"}</span></h3>
+      <div class="hits">${g.results.map((r) => hitHtml(g, r)).join("") || (g.error ? "" : `<p class="muted small">Tidak ada hasil.</p>`)}</div>
+      <div class="foot">${g.error || !g.count ? "" : groupFooter(g, g.results.length)}</div>
     </div>`).join("");
+}));
+$("#searchRes").addEventListener("click", guard(async (e) => {
+  const b = e.target.closest("[data-more]"); if (!b) return;
+  b.disabled = true; b.textContent = "memuat…";
+  const [g] = await api(`/api/search?q=${encodeURIComponent(lastQuery)}&instances=${b.dataset.more}&size=${SEARCH_SIZE}&page=${b.dataset.page}`);
+  const box = $(`[data-group="${b.dataset.more}"]`);
+  $(".hits", box).insertAdjacentHTML("beforeend", g.results.map((r) => hitHtml(g, r)).join(""));
+  $(".foot", box).innerHTML = groupFooter(g, $$(".hit", box).length);
 }));
 
 /* ------------------------------------------------------------------ migrasi */
